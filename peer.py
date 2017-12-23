@@ -39,15 +39,13 @@ class ServerThread (threading.Thread):
         self.cQueue = clientQueue
         self.fihrist = fihrist
         self.uuid = False
-        self.exitf = True
         self.trueTest = False
 
     def run(self):
         self.lQueue.put("Starting " + self.name)
-        while self.exitf:
+        while True:
             data = self.sock.recv(1024).decode()
             self.parser(data)
-        self.lQueue.put("Exiting " + self.name)
 
     def parser(self, data):
         msg = data.strip().split(" ")
@@ -60,7 +58,8 @@ class ServerThread (threading.Thread):
                 self.sock.send(val.encode())
             else:
                 if msg[0] == "USR":
-                    if msg[1] not in self.fihrist and (msg[2] == True or msg[2] == False):
+                    # msg[2] dedigimiz 1 ise peer, 0 ise N_Server
+                    if msg[1] not in self.fihrist and (msg[2] == 0 or msg[2] == 1):
                         self.uuid = msg[1]
                         self.sock.send(("HEL " + msg[1]).encode())
                         self.lQueue.put(time.ctime() + "-" + self.address + ":" + self.uuid + " has added to list.\n")
@@ -114,19 +113,96 @@ class ClientThread (threading.Thread):
         self.lQueue = logQueue
         self.cQueue = clientQueue
         self.fihrist = fihrist
-        self.uuid = False
+        # TODO uuid unique secilecek
+        self.uuid = uuid.uuid4()
+        self.exitf = False
+        self.trueTest = False
+
+    def run(self):
+        self.lQueue.put("Starting " + self.name)
+        while not self.exitf:
+            msg = self.cQueue.get()
+            self.parser(msg)
+        self.lQueue.put("Exiting " + self.name)
+
+    def parser(self, msg):
+        msg = msg.strip().split(" ")
+
+        if len(msg) == 1 and msg[0] == "TIC":
+            self.sock.send("TOC".encode())
+        elif len(msg) == 1 and msg[0] == "LSQ":
+            # TODO liste alma fonksiyonunu cagir(once yazilmasi gerekiyor :D)
+            pass
+        elif len(msg) == 1 and msg[0] == "QUI":
+            self.sock.send("QUI".encode())
+        elif len(msg) == 1 and msg[0] == "USR":
+            self.sock.send(("USR " + self.uuid + " 1").encode())
+        elif len(msg) == 2 and msg[0] == "SHN":
+            self.sock.send(("SHN " + msg[1]).encode())
+        elif len(msg) == 2 and msg[0] == "SHC":
+            self.sock.send(("SHC " + msg[1]).encode())
+        elif len(msg) == 3 and msg[0] == "MSG":
+            # TODO Mesaj duzgunce ayarlanip gonderilecek
+            pass
+        elif len(msg) == 3 and msg[0] == "DWL":
+            # TODO indirme icin paket isteyecek
+            pass
+
+        # FIXME burasi daha bitmedi!!
+
+
+class ListUpdaterThread (threading.Thread):
+    def __init__(self, name, logQueue, clientQueue, fihrist):
+        threading.Thread.__init__(self)
+        self.name = name
+        self.lQueue = logQueue
+        self.cQueue = clientQueue
+        self.fihrist = fihrist
         self.exitf = True
         self.trueTest = False
 
     def run(self):
-            while self.exitf == 0:
-                msg = self.cQueue.get()
-                self.parser(msg)
+        while True:
+            for a in self.fihrist:
+                if time.time() - time.mktime(self.fihrist[a][1]) > 600:
+                    # TODO listeddeki kisiyi canli mi diye kontrol et
+                    pass
+            time.sleep(1)
 
-    def parser(self, msg):
-        msg = msg.strip().split(" ")
-        # TODO uuid unique secilecek
-        newUuid = uuid.uuid4()
-        if len(msg) == 1 and msg[0] == "TIC":
-            self.sock.send("TOC".encode())
-        # FIXME burasi daha bitmedi!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
