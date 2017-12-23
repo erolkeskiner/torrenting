@@ -1,9 +1,6 @@
-import socket
 import threading
 import time
 from multiprocessing import Queue
-import pickle
-import os
 import uuid
 
 
@@ -39,7 +36,7 @@ class ServerThread (threading.Thread):
         self.cQueue = clientQueue
         self.fihrist = fihrist
         self.uuid = False
-        self.trueTest = False
+        self.trueTest = 0
 
     def run(self):
         self.lQueue.put("Starting " + self.name)
@@ -75,13 +72,17 @@ class ServerThread (threading.Thread):
                     self.sock.send(val.encode())
         elif self.trueTest:
             if len(msg) == 1 and msg[0] == "LSQ":
-                peer_list_pickle = pickle.dumps(self.fihrist)
-                # FIXME send komutuyla iki eleman gonderiliyor mu kontrol edilecek
-                self.sock.send("LSA ".encode(), peer_list_pickle)
+                self.sock.send(("LSA " + self.list_returner(self.fihrist)).encode())
             elif len(msg) == 1 and msg[0] == "QUI":
                 if self.uuid in self.fihrist:
                     del self.fihrist[self.uuid]
 
+    def list_returner(self, fihrist):
+        b = ""
+        for a in fihrist:
+            if fihrist[a][2] == 1:
+                b += "?".join(fihrist[a]) + "|"
+        return b
 
 class ClientThread (threading.Thread):
     def __init__(self, name, sock, address, logQueue, clientQueue, fihrist):
@@ -110,10 +111,14 @@ class ClientThread (threading.Thread):
         if len(msg) == 1 and msg[0] == "TIC":
             self.sock.send("TOC".encode())
         elif len(msg) == 1 and msg[0] == "LSQ":
-            # TODO liste alma fonksiyonunu cagir(once yazilmasi gerekiyor :D)
-            pass
+            self.sock.send("LSQ".encode())
         elif len(msg) == 1 and msg[0] == "QUI":
             self.sock.send("QUI".encode())
+            self.exitf = 1
+        elif len(msg) == 1 and msg[0] == "DLT":
+            self.sock.send("DLT".encode())
+
+
 
 
 class ListUpdaterThread (threading.Thread):
@@ -130,6 +135,6 @@ class ListUpdaterThread (threading.Thread):
         while True:
             for a in self.fihrist:
                 if time.time() - time.mktime(self.fihrist[a][1]) > 600:
-                    # TODO listeddeki kisiyi canli mi diye kontrol et
+                    self.cQueue[a].put("DLT")
                     pass
             time.sleep(1)
