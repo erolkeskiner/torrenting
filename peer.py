@@ -39,7 +39,7 @@ class ServerThread (threading.Thread):
         self.cQueue = clientQueue
         self.fihrist = fihrist
         self.uuid = False
-        self.trueTest = False
+        self.trueTest = 0
 
     def run(self):
         self.lQueue.put("Starting " + self.name)
@@ -64,20 +64,21 @@ class ServerThread (threading.Thread):
                         self.sock.send(("HEL " + msg[1]).encode())
                         self.lQueue.put(time.ctime() + "-" + self.address + ":" + self.uuid + " has added to list.\n")
                         self.fihrist[self.uuid] = [self.address, time.ctime(), self.trueTest, msg[2]]
-                        # TODO gerceklik testi gerceklestir
+                        self.cQueue[self.uuid].put("DLT")
                     else:
                         self.lQueue.put(time.ctime() + "-" + self.address + ":" + self.uuid + " has renewed.\n")
                         self.fihrist[self.uuid][1] = time.ctime()
-                        # TODO gerceklik testi gerceklestir
                 else:
                     val = "ERR: Need Login"
                     self.lQueue.put(time.ctime() + "-" + str(self.address) + ": " + val)
                     self.sock.send(val.encode())
+        elif not self.trueTest:
+            if len(msg) == 2 and msg[0] == "ULT":
+                if msg[1] == self.uuid:
+                    self.fihrist[self.uuid][2] = 1
         elif self.trueTest:
             if len(msg) == 1 and msg[0] == "LSQ":
-                peer_list_pickle = pickle.dumps(self.fihrist)
-                # FIXME send komutuyla iki eleman gonderiliyor mu kontrol edilecek
-                self.sock.send("LSA ".encode(), peer_list_pickle)
+                self.sock.send(("LSA " + self.list_returner(self.fihrist)).encode())
             elif len(msg) == 1 and msg[0] == "QUI":
                 if self.uuid in self.fihrist:
                     del self.fihrist[self.uuid]
@@ -102,6 +103,13 @@ class ServerThread (threading.Thread):
             # TODO DWL komutu icin UPL komutu yazilmali
 
         # FIXME Parser henuz bitmedi!! MSG komutu eklenecek
+
+    def list_returner(self, fihrist):
+        b = ""
+        for a in fihrist:
+            if fihrist[a][2] == 1:
+                b += "?".join(str(fihrist[a])) + "|"
+        return b
 
 
 class ClientThread (threading.Thread):
@@ -129,12 +137,14 @@ class ClientThread (threading.Thread):
         msg = msg.strip().split(" ")
 
         if len(msg) == 1 and msg[0] == "TIC":
-            self.sock.send("TOC".encode())
+            self.sock.send("TIC".encode())
         elif len(msg) == 1 and msg[0] == "LSQ":
-            # TODO liste alma fonksiyonunu cagir(once yazilmasi gerekiyor :D)
-            pass
+            self.sock.sen("LSQ".encode())
         elif len(msg) == 1 and msg[0] == "QUI":
             self.sock.send("QUI".encode())
+            self.exitf = 1
+        elif len(msg) == 1 and msg[0] == "DLT":
+            self.sock.send("DLT".encode())
         elif len(msg) == 1 and msg[0] == "USR":
             self.sock.send(("USR " + self.uuid + " 1").encode())
         elif len(msg) == 2 and msg[0] == "SHN":
@@ -142,7 +152,7 @@ class ClientThread (threading.Thread):
         elif len(msg) == 2 and msg[0] == "SHC":
             self.sock.send(("SHC " + msg[1]).encode())
         elif len(msg) == 3 and msg[0] == "MSG":
-            # TODO Mesaj duzgunce ayarlanip gonderilecek
+            self.sock.send(("MSG " + self.uuid + " " + " ".join(msg[2:])).encode())
             pass
         elif len(msg) == 3 and msg[0] == "DWL":
             # TODO indirme icin paket isteyecek
@@ -165,25 +175,8 @@ class ListUpdaterThread (threading.Thread):
         while True:
             for a in self.fihrist:
                 if time.time() - time.mktime(self.fihrist[a][1]) > 600:
-                    # TODO listeddeki kisiyi canli mi diye kontrol et
-                    pass
+                    self.cQueue[a].put("DLT")
             time.sleep(1)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
