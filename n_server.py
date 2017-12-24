@@ -27,7 +27,7 @@ class LoggerThread (threading.Thread):
 
 
 loggerQueue = Queue()
-lThread = LoggerThread("NServerLoggerThread", loggerQueue)
+lThread = LoggerThread("PeerLoggerThread", loggerQueue)
 lThread.start()
 
 
@@ -51,7 +51,7 @@ class ServerIdiotClient (threading.Thread):
         self.lQueue.put("Starting " + self.name)
         s = socket.socket()
         host = self.address
-        port = 12345
+        port = 55555
         s.connect((host, port))
         s.send("DLT".encode())
         # komutu gonderdikten sonra dinlemeye basliyoruz. eger bize gonderecegi uuid
@@ -81,13 +81,19 @@ class ListUpdaterThread (threading.Thread):
         self.fihrist = fihrist
         # uid karsinin uuid
         self.uid = uid
+        # bizim uuid
+        self.uid2 = uid2
 
     def run(self):
+        self.lQueue.put("Starting " + self.name)
         while True:
             for a in self.fihrist:
+                # kendi serverimizi test etmeye gerek yok
+                if a == self.uid2:
+                    continue
                 # her 4 dakika da bir listeyi kontrol ediyor. 10 dakikadir timestampi yenilenmemis olanlari ve
                 # download testi gecmemis olanlari test ediyor gecerlerse zaman damgasi basip okey veriyor
-                if self.fihrist[a][2] == 0 or (time.time() - time.mktime(self.fihrist[a][1]) > 600):
+                if self.fihrist[a][2] == 0:
 
                     sic = ServerIdiotClient("ServerIdiotClient", self.address, self.lQueue, self.fihrist,
                                             self.uid)
@@ -95,10 +101,14 @@ class ListUpdaterThread (threading.Thread):
                 # 10 dakikadir baglantiyi duzgun kurammais birileri varsa onlarin testini false yapiyor(aslinda 0)
                 if time.time() - time.mktime(self.fihrist[a][1]) > 600:
                     self.fihrist[a][2] = 0
+                # 20 dakikadir baglanamiyorsak listeden cikariyoruz
+                if time.time() - time.mktime(self.fihrist[a][1]) > 1200:
+                    del self.fihrist[a]
             # 4 dakika bekle bu sayede 10 dakikalik izin suresi icinde 2 defa kontrol edilebilirler ve
             # gecikmelere tolerans gosterilebilir
             time.sleep(240)
-
+        # FIXME program kapatilirken donguden cikmasi gerek
+        # self.lQueue.put("Exiting " + self.name)
 
 # server threadimiz reader writer diye ayrilmadi cunku bir server threadinin birden fazla clienti ilgilendiren
 # bir durumu yok. gerekirse bakariz
@@ -193,12 +203,38 @@ class ServerThread (threading.Thread):
         b = b.strip("|")
         return b
 
-    # baskasindan aldigimiz liste stringini parcalayip fihristin icine atiyor
-    # FIXME bu fonksiyon client icinde olacakti
-    def list_parser(self, msg):
-        # FIXME liste bos donerse ne olacak bakmak lazim
-        msg = msg.strip("|").split("|")
-        for a in msg:
-            b = a.split("?")
-            if not (b[0] in self.fihrist):
-                self.fihrist[b[0]] = b[1:]
+
+
+class ServerStarterThread (threading.Thread):
+    def __init__(self, name, sock, address, logQueue, fihrist, uid2):
+        threading.Thread.__init__(self)
+        self.name = name
+        self.sock = sock
+        self.address = address
+        self.lQueue = logQueue
+        self.fihrist = fihrist
+        # uid2 bizim uuid degerimiz sistem basalarken bi tane olusturulup butun threadlere dagitilacak
+        self.uid2 = uid2
+        # gercek bir serveri var mi
+        self.exitf = 0
+
+    def run(self):
+        self.lQueue.put("Starting " + self.name)
+        s = socket.socket()
+        host = "0.0.0.0"
+        port = 55555
+        s.bind((host, port))
+        s.listen(100)
+
+        thread_c = 0
+
+        while not self.exitf:
+            self.lQueue.put("Waiting for connection..." + "\n")
+            c, a = s.accept()
+            self.lQueue.put("Got connection from " + str(a) + "\n")
+            thread_c += 1
+            sThread = ServerThread("ServerThread-" + str(thread_c), c, a, self.lQueue, self.fihrist, self.uid2)
+            sThread.start()
+
+        # FIXME programi kapatirken donguden cikilmali
+        self.lQueue.put("Exiting " + self.name)
