@@ -13,6 +13,23 @@ def md5sum(filename, blocksize=2097152):
             hash.update(block)
     return hash.hexdigest()
 
+def makeMeta(filename,blocksize):
+    mSum = md5sum(filename)
+    filePath = 'shared/'+filename
+
+    with open(filePath, "rb") as f:
+        content = f.read()
+
+        fn, file_extension = os.path.splitext(filename)
+
+        chunkNumber = int(len(content) / blocksize) + 1
+        statinfo = os.stat(f.name)
+        dict = {'FileName': filename, 'FileSize':str(statinfo.st_size),'MD5SUM':mSum,'NumberOfChunks':chunkNumber}
+        print(dict)
+        pickle_out = open('meta/'+str(mSum)+'.pickle', 'wb')
+        pickle.dump(dict,pickle_out)
+        pickle_out.close()
+
 def separete_to_chunks(filename,blocksize):
     filePath = 'shared/'+filename
     mSum = md5sum(filename)
@@ -49,15 +66,16 @@ def chunks_to_file(mSum):
         for i in range(c):
             with open('tmp/'+mSum+'-{}'.format(i),'rb') as chunk:
                 o.write(chunk.read())
-        for i in range(c):
-            os.remove('tmp/'+mSum+'-{}'.format(i))
+            os.remove('tmp/' + mSum + '-{}'.format(i))
 
 
 
 
 
-fileName ='asd.jpg'
-chunkSize = 10240 # as bytes
+
+
+fileName ='DSCF3403.MOV'
+chunkSize = 1048576 # as bytes
 
 
 
@@ -65,6 +83,7 @@ chunkSize = 10240 # as bytes
 m = md5sum(fileName)
 print(m)
 
+#makeMeta(fileName,chunkSize)
 
 #separete_to_chunks(fileName,chunkSize)
 chunks_to_file(m)
