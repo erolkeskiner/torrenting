@@ -5,6 +5,7 @@ from multiprocessing import Queue
 import pickle
 import os
 
+MB1 = 1048576
 
 # logger threadimiz sadece ekrana basiyor ve QUIT yazarsak cikiyor
 # dosyaya yazan seklinde degistirebiliriz
@@ -110,10 +111,11 @@ class ListUpdaterThread (threading.Thread):
         # FIXME program kapatilirken donguden cikmasi gerek
         # self.lQueue.put("Exiting " + self.name)
 
+
 # server threadimiz reader writer diye ayrilmadi cunku bir server threadinin birden fazla clienti ilgilendiren
 # bir durumu yok. gerekirse bakariz
 class ServerThread (threading.Thread):
-    def __init__(self, name, sock, address, logQueue, fihrist, uid2):
+    def __init__(self, name, sock, address, logQueue, fihrist, uid2, interface_queue):
         threading.Thread.__init__(self)
         self.name = name
         self.sock = sock
@@ -127,6 +129,7 @@ class ServerThread (threading.Thread):
         # gercek bir serveri var mi
         self.trueTest = 0
         self.exitf = 0
+        self.ifrQueue = interface_queue
 
     def run(self):
         self.lQueue.put("Starting " + self.name)
@@ -195,23 +198,30 @@ class ServerThread (threading.Thread):
                 if msg[0] == "SHN":
                     list_of_files = os.listdir("./torrent_files")
                     if msg[1] in list_of_files:
-                        meta_data_pickle = pickle.load(msg[1])
-                        # FIXME send komutuyla iki eleman gonderiliyor mu kontrol edilecek
-                        self.sock.send("VAN".encode(), meta_data_pickle)
+                        a = self.meta_data_returner(msg[1])
+                        self.sock.send(("VAN " + " ".join(a)).encode())
                     else:
                         # TODO benzer isimleri dondurmeli
                         self.sock.send("YON".encode())
                 elif msg[0] == "SHC":
                     list_of_files = os.listdir("./torrent_files")
                     if msg[1] in list_of_files:
-                        # TODO meta datasi gonderilmeli
                         self.sock.send("VAC".encode())
                     else:
                         self.sock.send("YOC".encode())
+            elif len(msg) == 3 and msg[0] == "DWL":
+                if msg[1] in os.listdir("./torrent_files/"):
+                    chunk = self.chunk_returner(msg[1], msg[2])
+                    self.sock.send(("UPL " + " ".join([msg[1:], str(chunk)])).encode())
+                else:
+                    self.sock.send("ERR: File does not exists.".encode())
+            elif len(msg) >= 3 and msg[0] == "MSG":
+                if msg[1] == self.uid2:
+                    self.sock.send("MOK".encode())
+                    self.ifrQueue.put("MSG " + " ".join(msg[1:]))
+                else:
+                    self.sock.send(("MNO " + msg[1]).encode())
 
-            # TODO DWL komutu icin UPL komutu yazilmali
-
-        # TODO Parser henuz bitmedi!! MSG komutu eklenecek
 
     # fihrist icindeki ip listesini string yapip donduruyor
     def list_returner(self):
@@ -225,25 +235,40 @@ class ServerThread (threading.Thread):
         b = b.strip("|")
         return b
 
+    def chunk_returner(self, md5sum, chunk_no):
+        with open("./torrent_files/" + md5sum, 'rb') as file:
+            file.seek(MB1*chunk_no)
+            return file.read(MB1)
+
+    def meta_data_returner(self, filename):
+        with open("./torrent_files/" + filename, "rb") as f:
+            msg = f.readline()
+            msg = str(msg.strip())
+            a = []
+            a.append(msg)
+            msg = f.readline()
+            msg = str(msg.strip())
+            a.append(msg)
+            return a
 
 # client threadimiz. isteklerde bulunacak threadimiz
 class ClientWriterThread (threading.Thread):
-    def __init__(self, name, sock, address, logQueue, peerQueue, fihrist, uid):
+    def __init__(self, name, sock, address, logQueue, clientQueue, fihrist, uid2):
         threading.Thread.__init__(self)
         self.name = name
         self.sock = sock
         self.address = address
         self.lQueue = logQueue
-        self.pQueue = peerQueue
+        self.cQueue = clientQueue
         self.fihrist = fihrist
         # TODO uuid unique secilecek
-        self.uid = uid
+        self.uid2 = uid2
         self.exitf = False
 
     def run(self):
         self.lQueue.put("Starting " + self.name)
         while not self.exitf:
-            msg = self.pQueue[self.uid].get()
+            msg = self.cQueue.get()
             self.parser(msg)
         self.lQueue.put("Exiting " + self.name)
 
@@ -257,7 +282,7 @@ class ClientWriterThread (threading.Thread):
             self.sock.send("QUI".encode())
             self.exitf = 1
         elif len(msg) == 1 and msg[0] == "USR":
-            self.sock.send(("USR " + self.uid + " 1").encode())
+            self.sock.send(("USR " + self.uid2 + " 1").encode())
         elif len(msg) == 2 and msg[0] == "SHN":
             self.sock.send(("SHN " + msg[1]).encode())
         elif len(msg) == 2 and msg[0] == "SHC":
@@ -265,30 +290,30 @@ class ClientWriterThread (threading.Thread):
         elif len(msg) == 3 and msg[0] == "MSG":
             self.sock.send(("MSG " + msg[1] + " " + " ".join(msg[2:])).encode())
         elif len(msg) == 3 and msg[0] == "DWL":
-            # TODO indirme icin paket isteyecek
-            pass
+            self.sock.send("DWL " + msg[1] + " " + msg[2])
 
         # FIXME burasi daha bitmedi!!
 
 
 class ClientReaderThread (threading.Thread):
-    def __init__(self, name, sock, address, logQueue, peerQueue, fihrist, uid, interface_reader_queue):
+    def __init__(self, name, sock, address, logQueue, clientQueue, fihrist, uid2, interface_reader_queue):
         threading.Thread.__init__(self)
         self.name = name
         self.sock = sock
         self.address = address
         self.lQueue = logQueue
-        self.pQueue = peerQueue
+        self.cQueue = clientQueue
         self.fihrist = fihrist
         # TODO uuid unique secilecek
-        self.uid = uid
+        self.uid2 = uid2
         self.exitf = False
         self.ifrQueue = interface_reader_queue
+        self.meta_exists = 0
 
     def run(self):
         self.lQueue.put("Starting " + self.name)
         while not self.exitf:
-            msg = self.sock.recv(1024).decode()
+            msg = self.sock.recv(MB1 + 64).decode()
             self.parser(msg)
         self.lQueue.put("Exiting " + self.name)
 
@@ -305,7 +330,7 @@ class ClientReaderThread (threading.Thread):
             self.ifrQueue.put(" ".join(msg))
         elif len(msg) >= 1 and msg[0] == "YON":
             self.ifrQueue.put(" ".join(msg))
-        elif len(msg) >= 2 and msg[0] == "VAC":
+        elif len(msg) == 1 and msg[0] == "VAC":
             self.ifrQueue.put(" ".join(msg))
         elif len(msg) >= 1 and msg[0] == "YOC":
             self.ifrQueue.put(" ".join(msg))
@@ -313,6 +338,10 @@ class ClientReaderThread (threading.Thread):
             self.ifrQueue.put(msg[0])
         elif len(msg) == 2 and msg[0] == "MNO":
             self.ifrQueue.put(" ".join(msg))
+        elif len(msg) >= 4 and msg[0] == "UPL":
+            # FIXME chunkin sonu bosluk karakteri falansa ne olacak?
+            self.chunk_writer(msg[1], msg[2], " ".join(msg[3:]))
+
 
     # baskasindan aldigimiz liste stringini parcalayip fihristin icine atiyor
     def list_parser(self, msg):
@@ -323,11 +352,15 @@ class ClientReaderThread (threading.Thread):
             if not (b[0] in self.fihrist):
                 self.fihrist[b[0]] = b[1:]
 
-
+    def chunk_writer(self, md5sum, chunk_no, chunk_data):
+        chunk_data = chunk_data.encode()
+        with open("./torrent_files/" + md5sum, "wb+") as f:
+            f.seek(MB1*chunk_no)
+            f.write(chunk_data)
 
 
 class ServerStarterThread (threading.Thread):
-    def __init__(self, name, sock, address, logQueue, fihrist, uid2):
+    def __init__(self, name, sock, address, logQueue, fihrist, uid2, interface_queue):
         threading.Thread.__init__(self)
         self.name = name
         self.sock = sock
@@ -338,6 +371,7 @@ class ServerStarterThread (threading.Thread):
         self.uid2 = uid2
         # gercek bir serveri var mi
         self.exitf = 0
+        self.ifQueue = interface_queue
 
     def run(self):
         self.lQueue.put("Starting " + self.name)
@@ -354,7 +388,7 @@ class ServerStarterThread (threading.Thread):
             c, a = s.accept()
             self.lQueue.put("Got connection from " + str(a) + "\n")
             thread_c += 1
-            sThread = ServerThread("ServerThread-" + str(thread_c), c, a, self.lQueue, self.fihrist, self.uid2)
+            sThread = ServerThread("ServerThread-" + str(thread_c), c, a, self.lQueue, self.fihrist, self.uid2, self.ifQueue)
             sThread.start()
 
         # FIXME programi kapatirken donguden cikilmali
