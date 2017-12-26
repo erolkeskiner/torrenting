@@ -1,0 +1,3 @@
+To push directory 
+Normally this directory contains chunks
+These chunks will be removed after download is finished
