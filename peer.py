@@ -2,14 +2,12 @@ import socket
 import threading
 import time
 from multiprocessing import Queue
-import pickle
 import os
 
 MB1 = 1048576
 
 # logger threadimiz sadece ekrana basiyor ve QUIT yazarsak cikiyor
 # dosyaya yazan seklinde degistirebiliriz
-# burda cagiriliyor zaten
 class LoggerThread (threading.Thread):
     def __init__(self, name, lQueue):
         threading.Thread.__init__(self)
@@ -25,11 +23,6 @@ class LoggerThread (threading.Thread):
                 break
             print(str(msg))
         print(self.name + " exiting.")
-
-
-loggerQueue = Queue()
-lThread = LoggerThread("PeerLoggerThread", loggerQueue)
-lThread.start()
 
 
 # Serverimizin aptal clienti
@@ -360,11 +353,9 @@ class ClientReaderThread (threading.Thread):
 
 
 class ServerStarterThread (threading.Thread):
-    def __init__(self, name, sock, address, logQueue, fihrist, uid2, interface_queue):
+    def __init__(self, name, logQueue, fihrist, uid2, interface_queue):
         threading.Thread.__init__(self)
         self.name = name
-        self.sock = sock
-        self.address = address
         self.lQueue = logQueue
         self.fihrist = fihrist
         # uid2 bizim uuid degerimiz sistem basalarken bi tane olusturulup butun threadlere dagitilacak
