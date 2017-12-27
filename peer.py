@@ -200,7 +200,7 @@ class ServerThread (threading.Thread):
                         self.sock.send(("VAN " + " ".join(a)).encode())
                     else:
                         # TODO benzer isimleri dondurmeli
-                        
+
                         self.sock.send("YON".encode())
                 elif msg[0] == "SHC":
                     list_of_files = os.listdir("./meta/")
