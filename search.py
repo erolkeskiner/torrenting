@@ -12,10 +12,11 @@ from difflib import SequenceMatcher
 
 
 
-list= []
+
 
 
 def search(fileName):
+    list = []
     for name in glob.glob('shared/*'):
         # print (name)
         x = name.split('\\')
@@ -31,7 +32,7 @@ def search(fileName):
     if ask in list:
         # print("%s file is in shared directory" % (ask))
 
-        return  True, ask
+        return  True, [ask]
 
 
 
@@ -42,9 +43,9 @@ def search(fileName):
         m.reverse()
         if len(m) >= 3:
             return False,[m[0], m[1], m[2]]
-        elif len(m) >=2:
+        elif len(m) ==2:
             return False,[m[0],m[1]]
-        elif len(m) >=1:
+        elif len(m) ==1:
             return False,[m[0]]
         else:
             return False, []
