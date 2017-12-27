@@ -74,48 +74,53 @@ class Window(QtWidgets.QWidget):
         hSearchBox = QtWidgets.QHBoxLayout()
 
         hSearchBox.addWidget(self.fileNameLabel)
+        hSearchBox.addStretch()
 
         hSearchBox.addWidget(self.fileNameTextEdit)
-
+        hSearchBox.addStretch()
 
 
         hSearchBox.addWidget(self.searchButton)
+        hSearchBox.addStretch()
 
 
         torrentVBox.addLayout(hSearchBox)
-
+        torrentVBox.addStretch()
         torrentVBox.addWidget(self.resultOfSearch)
-
+        torrentVBox.addStretch()
         torrentVBox.addWidget(self.foundCheckBrowser)
-
+        torrentVBox.addStretch()
         torrentVBox.addWidget(self.downloadButton)
+        torrentVBox.addStretch()
 
         mainHBox.addLayout(torrentVBox)
+        mainHBox.addStretch()
 
 
         listVBox = QtWidgets.QVBoxLayout()
 
         listVBox.addWidget(self.userListLabel)
-
+        listVBox.addStretch()
         listVBox.addWidget(self.userListWidget)
-
+        listVBox.addStretch()
 
         messageVBox.addLayout(listVBox)
-
+        messageVBox.addStretch()
 
         mVBox = QtWidgets.QVBoxLayout()
         mVBox.addWidget(self.messagesLabel)
+        mVBox.addStretch()
         mVBox.addWidget(self.viewMessages)
-
+        mVBox.addStretch()
         mVBox.addWidget(self.messageToSend)
-
+        mVBox.addStretch()
         mVBox.addWidget(self.sendButton)
-
+        mVBox.addStretch()
 
         messageVBox.addLayout(mVBox)
-
+        messageVBox.addStretch()
         mainHBox.addLayout(messageVBox)
-        # mainHBox.addStretch()
+        mainHBox.addStretch()
 
         self.setLayout(mainHBox)
 
@@ -135,8 +140,8 @@ class Window(QtWidgets.QWidget):
 
 
     def start_download(self):
-        fileChoise = self.resultOfSearch.selectedItems()
-        print(fileChoise.text())
+        fileChoise = self.resultOfSearch.currentItem().text()
+        print(fileChoise)
     def sendMessage(self):
         message = self.messageToSend.toPlainText()
 
