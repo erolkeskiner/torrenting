@@ -5,6 +5,7 @@ from multiprocessing import Queue
 import os
 import separateAndUnite
 import pickle
+import search
 
 MB1 = 1048576
 
@@ -191,8 +192,8 @@ class ServerThread (threading.Thread):
             elif len(msg) == 2:
                 # Search komutlari burda
                 if msg[0] == "SHN":
-                    list_of_files = os.listdir("./shared/")
-                    if msg[1] in list_of_files:
+                    c, d = search.search(msg[1])
+                    if c:
                         md5_a = separateAndUnite.md5sum(msg[1], MB1)
                         if not os.path.exists("./meta/" + md5_a):
                             separateAndUnite.makeMeta(msg[1], MB1)
@@ -201,7 +202,7 @@ class ServerThread (threading.Thread):
                     else:
                         # TODO benzer isimleri dondurmeli
 
-                        self.sock.send("YON".encode())
+                        self.sock.send(("YON " + " ".join(d)).encode())
                 elif msg[0] == "SHC":
                     list_of_files = os.listdir("./meta/")
                     if msg[1] in list_of_files:
@@ -248,11 +249,10 @@ class ServerThread (threading.Thread):
 
 # client threadimiz. isteklerde bulunacak threadimiz
 class ClientWriterThread (threading.Thread):
-    def __init__(self, name, sock, address, logQueue, clientQueue, fihrist, uid2):
+    def __init__(self, name, sock, logQueue, clientQueue, fihrist, uid2):
         threading.Thread.__init__(self)
         self.name = name
         self.sock = sock
-        self.address = address
         self.lQueue = logQueue
         self.cQueue = clientQueue
         self.fihrist = fihrist
@@ -291,11 +291,10 @@ class ClientWriterThread (threading.Thread):
 
 
 class ClientReaderThread (threading.Thread):
-    def __init__(self, name, sock, address, logQueue, clientQueue, fihrist, uid2, interface_dict):
+    def __init__(self, name, sock, logQueue, clientQueue, fihrist, uid, uid2, interface_dict):
         threading.Thread.__init__(self)
         self.name = name
         self.sock = sock
-        self.address = address
         self.lQueue = logQueue
         self.cQueue = clientQueue
         self.fihrist = fihrist
@@ -304,6 +303,7 @@ class ClientReaderThread (threading.Thread):
         self.exitf = False
         self.ifDict = interface_dict
         self.meta_exists = 0
+        self.uid = uid
 
     def run(self):
         self.lQueue.put("Starting " + self.name)
@@ -316,19 +316,20 @@ class ClientReaderThread (threading.Thread):
         msg = msg.strip().split(" ")
         if len(msg) == 2 and msg[0] == "LSA":
             self.list_parser(msg[1])
-            self.ifDict.put("List has renewed")
+            self.lQueue.put("List updated.")
         elif len(msg) == 1 and msg[0] == "HEL":
-            self.ifDict.put(msg[0])
+            self.ifDict['res'].put(msg[0])
         elif len(msg) >= 2 and msg[0] == "REJ":
-            self.ifDict.put(" ".join(msg))
+            self.ifDict['res'].put(" ".join(msg))
         elif len(msg) >= 2 and msg[0] == "VAN":
-            self.ifDict.put(" ".join(msg))
+            self.ifDict['ListF'].append(" ".join(msg[1:]))
+            self.ifDict['res'].put("VAN")
         elif len(msg) >= 1 and msg[0] == "YON":
-            self.ifDict.put(" ".join(msg))
+            self.ifDict['res'].put(" ".join(msg))
         elif len(msg) == 1 and msg[0] == "VAC":
-            self.ifDict.put(" ".join(msg))
-        elif len(msg) >= 1 and msg[0] == "YOC":
-            self.ifDict.put(" ".join(msg))
+            self.ifDict['fUSers'][self.uid] = self.cQueue
+        elif len(msg) == 1 and msg[0] == "YOC":
+            self.ifDict['res'].put(" ".join(msg))
         elif len(msg) == 1 and msg[0] == "MOK":
             self.ifDict['res'].put('Mesaj gitti.')
         elif len(msg) == 2 and msg[0] == "MNO":
@@ -388,7 +389,15 @@ class ServerStarterThread (threading.Thread):
 
 
 
-
+def ClientStarter(address, logQueue, clientQueue, fihrist, uid, uid2, interface_dict):
+    s = socket.socket()
+    host = address
+    port = 55555
+    s.connect((host, port))
+    t = ClientWriterThread("CWT-" + address, s, logQueue, clientQueue, fihrist, uid2)
+    t.start()
+    t = ClientReaderThread("CRT-" + address, s, logQueue, clientQueue, fihrist, uid, uid2, interface_dict)
+    t.start()
 
 
 
