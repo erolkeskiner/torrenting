@@ -1,0 +1,2 @@
+To push directory 
+Normally this directory contains shared files
