@@ -124,7 +124,7 @@ class ServerThread (threading.Thread):
         # gercek bir serveri var mi
         self.trueTest = 0
         self.exitf = 0
-        self.ifrQueue = interface_queue
+        self.ifDict = interface_queue
 
     def run(self):
         self.lQueue.put("Starting " + self.name)
@@ -200,6 +200,7 @@ class ServerThread (threading.Thread):
                         self.sock.send(("VAN " + " ".join(a)).encode())
                     else:
                         # TODO benzer isimleri dondurmeli
+                        
                         self.sock.send("YON".encode())
                 elif msg[0] == "SHC":
                     list_of_files = os.listdir("./meta/")
@@ -217,7 +218,7 @@ class ServerThread (threading.Thread):
             elif len(msg) >= 3 and msg[0] == "MSG":
                 if msg[1] == self.uid2:
                     self.sock.send("MOK".encode())
-                    self.ifrQueue.put("MSG " + " ".join(msg[1:]))
+                    self.ifDict['msg'].put(msg[1] + ':' + " ".join(msg[2:]))
                 else:
                     self.sock.send(("MNO " + msg[1]).encode())
 
@@ -290,7 +291,7 @@ class ClientWriterThread (threading.Thread):
 
 
 class ClientReaderThread (threading.Thread):
-    def __init__(self, name, sock, address, logQueue, clientQueue, fihrist, uid2, interface_reader_queue):
+    def __init__(self, name, sock, address, logQueue, clientQueue, fihrist, uid2, interface_dict):
         threading.Thread.__init__(self)
         self.name = name
         self.sock = sock
@@ -301,7 +302,7 @@ class ClientReaderThread (threading.Thread):
         # TODO uuid unique secilecek
         self.uid2 = uid2
         self.exitf = False
-        self.ifrQueue = interface_reader_queue
+        self.ifDict = interface_dict
         self.meta_exists = 0
 
     def run(self):
@@ -315,23 +316,23 @@ class ClientReaderThread (threading.Thread):
         msg = msg.strip().split(" ")
         if len(msg) == 2 and msg[0] == "LSA":
             self.list_parser(msg[1])
-            self.ifrQueue.put("List has renewed")
+            self.ifDict.put("List has renewed")
         elif len(msg) == 1 and msg[0] == "HEL":
-            self.ifrQueue.put(msg[0])
+            self.ifDict.put(msg[0])
         elif len(msg) >= 2 and msg[0] == "REJ":
-            self.ifrQueue.put(" ".join(msg))
+            self.ifDict.put(" ".join(msg))
         elif len(msg) >= 2 and msg[0] == "VAN":
-            self.ifrQueue.put(" ".join(msg))
+            self.ifDict.put(" ".join(msg))
         elif len(msg) >= 1 and msg[0] == "YON":
-            self.ifrQueue.put(" ".join(msg))
+            self.ifDict.put(" ".join(msg))
         elif len(msg) == 1 and msg[0] == "VAC":
-            self.ifrQueue.put(" ".join(msg))
+            self.ifDict.put(" ".join(msg))
         elif len(msg) >= 1 and msg[0] == "YOC":
-            self.ifrQueue.put(" ".join(msg))
+            self.ifDict.put(" ".join(msg))
         elif len(msg) == 1 and msg[0] == "MOK":
-            self.ifrQueue.put(msg[0])
+            self.ifDict['res'].put('Mesaj gitti.')
         elif len(msg) == 2 and msg[0] == "MNO":
-            self.ifrQueue.put(" ".join(msg))
+            self.ifDict['res'].put('Kullanici bulunamadi.')
         elif len(msg) >= 4 and msg[0] == "UPL":
             # FIXME chunkin sonu bosluk karakteri falansa ne olacak?
             self.chunk_writer(msg[1], msg[2], " ".join(msg[3:]))

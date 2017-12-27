@@ -69,30 +69,3 @@ def chunks_to_file(mSum):
             os.remove('tmp/' + mSum + '-{}'.format(i))
 
 
-
-
-
-
-
-fileName ='DSCF3403.MOV'
-chunkSize = 1048576 # as bytes
-
-
-
-
-m = md5sum(fileName)
-print(m)
-
-#makeMeta(fileName,chunkSize)
-
-#separete_to_chunks(fileName,chunkSize)
-chunks_to_file(m)
-
-
-
-
-
-
-    
-    
-    
