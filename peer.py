@@ -3,6 +3,8 @@ import threading
 import time
 from multiprocessing import Queue
 import os
+import separateAndUnite
+import pickle
 
 MB1 = 1048576
 
@@ -145,7 +147,7 @@ class ServerThread (threading.Thread):
         elif not self.uid:
             # USR <uuid> <(server mi peer mi)> toplamda uc tane eleman olcak
             # yoksa hata verdiricez
-            if len(msg) != 3:
+            if len(msg) != 2:
                 val = "ERR: Need Login"
                 self.lQueue.put(time.ctime() + "-" + str(self.address) + ": " + val)
                 self.sock.send(val.encode())
@@ -153,13 +155,13 @@ class ServerThread (threading.Thread):
                 if msg[0] == "USR":
                     # msg[2] dedigimiz 1 ise peer, 0 ise N_Server. peer fihrist icinde yoksa
                     # kaydediyoruz ve downloadTest yapiyoruz
-                    if msg[1] not in self.fihrist and (msg[2] == 0 or msg[2] == 1):
+                    if msg[1] not in self.fihrist:
                         self.uid = msg[1]
                         self.sock.send(("HEL " + msg[1]).encode())
                         self.lQueue.put(time.ctime() + "-" + self.address + ":" + self.uid + " has added to list.\n")
                         # fihrist icinde sirasiyla adres, en son baglati zamani, gerceklik testi(downloadTest)
                         # false icin 0 true icin 1 ve son olarak peer mi server mi
-                        self.fihrist[self.uid] = [self.address, time.ctime(), self.trueTest, msg[2]]
+                        self.fihrist[self.uid] = [self.address, time.ctime(), self.trueTest]
                         # serveri gercekten varmi diye bakiyoruz
                         sic = ServerIdiotClient("ServerIdiotClient", self.address, self.lQueue, self.fihrist,
                                                 self.uid)
@@ -189,22 +191,26 @@ class ServerThread (threading.Thread):
             elif len(msg) == 2:
                 # Search komutlari burda
                 if msg[0] == "SHN":
-                    list_of_files = os.listdir("./torrent_files")
+                    list_of_files = os.listdir("./shared/")
                     if msg[1] in list_of_files:
-                        a = self.meta_data_returner(msg[1])
+                        md5_a = separateAndUnite.md5sum(msg[1], MB1)
+                        if not os.path.exists("./meta/" + md5_a):
+                            separateAndUnite.makeMeta(msg[1], MB1)
+                        a = self.meta_data_returner(md5_a)
                         self.sock.send(("VAN " + " ".join(a)).encode())
                     else:
                         # TODO benzer isimleri dondurmeli
                         self.sock.send("YON".encode())
                 elif msg[0] == "SHC":
-                    list_of_files = os.listdir("./torrent_files")
+                    list_of_files = os.listdir("./meta/")
                     if msg[1] in list_of_files:
                         self.sock.send("VAC".encode())
                     else:
                         self.sock.send("YOC".encode())
             elif len(msg) == 3 and msg[0] == "DWL":
-                if msg[1] in os.listdir("./torrent_files/"):
-                    chunk = self.chunk_returner(msg[1], msg[2])
+                if msg[1] in os.listdir("./meta/"):
+                    a = self.meta_data_returner(msg[1])
+                    chunk = self.chunk_returner(a[1], msg[2])
                     self.sock.send(("UPL " + " ".join([msg[1:], str(chunk)])).encode())
                 else:
                     self.sock.send("ERR: File does not exists.".encode())
@@ -229,20 +235,15 @@ class ServerThread (threading.Thread):
         return b
 
     def chunk_returner(self, md5sum, chunk_no):
-        with open("./torrent_files/" + md5sum, 'rb') as file:
+        with open("./shared/" + md5sum, 'rb') as file:
             file.seek(MB1*chunk_no)
             return file.read(MB1)
 
     def meta_data_returner(self, filename):
-        with open("./torrent_files/" + filename, "rb") as f:
-            msg = f.readline()
-            msg = str(msg.strip())
-            a = []
-            a.append(msg)
-            msg = f.readline()
-            msg = str(msg.strip())
-            a.append(msg)
+        with open("./meta/" + filename, "rb") as f:
+            a = pickle.load(f)
             return a
+
 
 # client threadimiz. isteklerde bulunacak threadimiz
 class ClientWriterThread (threading.Thread):
@@ -275,7 +276,7 @@ class ClientWriterThread (threading.Thread):
             self.sock.send("QUI".encode())
             self.exitf = 1
         elif len(msg) == 1 and msg[0] == "USR":
-            self.sock.send(("USR " + self.uid2 + " 1").encode())
+            self.sock.send(("USR " + self.uid2).encode())
         elif len(msg) == 2 and msg[0] == "SHN":
             self.sock.send(("SHN " + msg[1]).encode())
         elif len(msg) == 2 and msg[0] == "SHC":
@@ -347,8 +348,7 @@ class ClientReaderThread (threading.Thread):
 
     def chunk_writer(self, md5sum, chunk_no, chunk_data):
         chunk_data = chunk_data.encode()
-        with open("./torrent_files/" + md5sum, "wb+") as f:
-            f.seek(MB1*chunk_no)
+        with open("./tmp/" + md5sum + "-" + chunk_no, "wb+") as f:
             f.write(chunk_data)
 
 

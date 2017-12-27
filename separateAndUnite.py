@@ -5,7 +5,7 @@ import pickle
 
 
 
-def md5sum(filename, blocksize=2097152):
+def md5sum(filename, blocksize):
 
     hash = hashlib.md5()
     with open('shared/'+filename, "rb") as f:
