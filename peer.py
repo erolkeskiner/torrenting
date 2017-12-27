@@ -11,6 +11,7 @@ MB1 = 1048576
 
 # logger threadimiz sadece ekrana basiyor ve QUIT yazarsak cikiyor
 # dosyaya yazan seklinde degistirebiliriz
+# START
 class LoggerThread (threading.Thread):
     def __init__(self, name, lQueue):
         threading.Thread.__init__(self)
@@ -69,6 +70,7 @@ class ServerIdiotClient (threading.Thread):
 
 
 # ip listelerini guncelleyen thread gerekli degerler verilip ana thread uzerinden cagirilacak
+# START
 class ListUpdaterThread (threading.Thread):
     def __init__(self, name, address, logQueue, fihrist, uid, uid2):
         threading.Thread.__init__(self)
@@ -124,7 +126,7 @@ class ServerThread (threading.Thread):
         self.uid2 = uid2
         # gercek bir serveri var mi
         self.trueTest = 0
-        self.exitf = 0
+        self.exitf = False
         self.ifDict = interface_queue
 
     def run(self):
@@ -149,7 +151,7 @@ class ServerThread (threading.Thread):
             # USR <uuid> <(server mi peer mi)> toplamda uc tane eleman olcak
             # yoksa hata verdiricez
             if len(msg) != 2:
-                val = "ERR: Need Login"
+                val = "ERR Need Login"
                 self.lQueue.put(time.ctime() + "-" + str(self.address) + ": " + val)
                 self.sock.send(val.encode())
             else:
@@ -177,18 +179,19 @@ class ServerThread (threading.Thread):
                 # 3 tane parametre gondermis ama birincisi USR degilse buraya girecek
                 # neden bastan kontrol etmedin derseniz.. Bilmiyorum. O an mantikli gelmisti.
                 else:
-                    val = "ERR: Need Login"
+                    val = "ERR Need Login"
                     self.lQueue.put(time.ctime() + "-" + str(self.address) + ": " + val)
                     self.sock.send(val.encode())
+        elif len(msg) == 1 and msg[0] == "QUI":
+            if self.uid in self.fihrist:
+                del self.fihrist[self.uid]
+            self.sock.send("BYE".encode())
+            self.exitf = True
         # buraya girerse testi gecmis ve istedigini yapabilir
         elif self.trueTest:
             if len(msg) == 1 and msg[0] == "LSQ":
                 self.sock.send(("LSA " + self.list_returner()).encode())
             # QUI komutu gelmisse bu thread kapatilacak main threadler hala calisiyor olacak ama
-            elif len(msg) == 1 and msg[0] == "QUI":
-                if self.uid in self.fihrist:
-                    del self.fihrist[self.uid]
-                self.exitf = 1
             elif len(msg) == 2:
                 # Search komutlari burda
                 if msg[0] == "SHN":
@@ -200,8 +203,6 @@ class ServerThread (threading.Thread):
                         a = self.meta_data_returner(md5_a)
                         self.sock.send(("VAN " + " ".join(a)).encode())
                     else:
-                        # TODO benzer isimleri dondurmeli
-
                         self.sock.send(("YON " + " ".join(d)).encode())
                 elif msg[0] == "SHC":
                     list_of_files = os.listdir("./meta/")
@@ -215,13 +216,15 @@ class ServerThread (threading.Thread):
                     chunk = self.chunk_returner(a[1], msg[2])
                     self.sock.send(("UPL " + " ".join([msg[1:], str(chunk)])).encode())
                 else:
-                    self.sock.send("ERR: File does not exists.".encode())
+                    self.sock.send("ERR File does not exists.".encode())
             elif len(msg) >= 3 and msg[0] == "MSG":
                 if msg[1] == self.uid2:
                     self.sock.send("MOK".encode())
                     self.ifDict['msg'].put(msg[1] + ':' + " ".join(msg[2:]))
                 else:
                     self.sock.send(("MNO " + msg[1]).encode())
+        else:
+            self.sock.send("ERR Invalid command")
 
 
     # fihrist icindeki ip listesini string yapip donduruyor
@@ -249,7 +252,7 @@ class ServerThread (threading.Thread):
 
 # client threadimiz. isteklerde bulunacak threadimiz
 class ClientWriterThread (threading.Thread):
-    def __init__(self, name, sock, logQueue, clientQueue, fihrist, uid2):
+    def __init__(self, name, sock, logQueue, clientQueue, fihrist, uid, uid2):
         threading.Thread.__init__(self)
         self.name = name
         self.sock = sock
@@ -259,11 +262,12 @@ class ClientWriterThread (threading.Thread):
         # TODO uuid unique secilecek
         self.uid2 = uid2
         self.exitf = False
+        self.uid = uid
 
     def run(self):
         self.lQueue.put("Starting " + self.name)
         while not self.exitf:
-            msg = self.cQueue.get()
+            msg = self.cQueue[self.uid].get()
             self.parser(msg)
         self.lQueue.put("Exiting " + self.name)
 
@@ -275,7 +279,7 @@ class ClientWriterThread (threading.Thread):
             self.sock.sen("LSQ".encode())
         elif len(msg) == 1 and msg[0] == "QUI":
             self.sock.send("QUI".encode())
-            self.exitf = 1
+            self.exitf = True
         elif len(msg) == 1 and msg[0] == "USR":
             self.sock.send(("USR " + self.uid2).encode())
         elif len(msg) == 2 and msg[0] == "SHN":
@@ -321,13 +325,15 @@ class ClientReaderThread (threading.Thread):
             self.ifDict['res'].put(msg[0])
         elif len(msg) >= 2 and msg[0] == "REJ":
             self.ifDict['res'].put(" ".join(msg))
+        elif len(msg) == 1 and msg[0] == "BYE":
+            self.exitf = True
         elif len(msg) >= 2 and msg[0] == "VAN":
             self.ifDict['ListF'].append(" ".join(msg[1:]))
             self.ifDict['res'].put("VAN")
         elif len(msg) >= 1 and msg[0] == "YON":
             self.ifDict['res'].put(" ".join(msg))
         elif len(msg) == 1 and msg[0] == "VAC":
-            self.ifDict['fUSers'][self.uid] = self.cQueue
+            self.ifDict['fUSers'][self.uid] = self.cQueue[self.uid]
         elif len(msg) == 1 and msg[0] == "YOC":
             self.ifDict['res'].put(" ".join(msg))
         elif len(msg) == 1 and msg[0] == "MOK":
@@ -337,6 +343,8 @@ class ClientReaderThread (threading.Thread):
         elif len(msg) >= 4 and msg[0] == "UPL":
             # FIXME chunkin sonu bosluk karakteri falansa ne olacak?
             self.chunk_writer(msg[1], msg[2], " ".join(msg[3:]))
+        else:
+            self.ifDict['res'].put(" ".join(msg))
 
 
     # baskasindan aldigimiz liste stringini parcalayip fihristin icine atiyor
@@ -353,7 +361,7 @@ class ClientReaderThread (threading.Thread):
         with open("./tmp/" + md5sum + "-" + chunk_no, "wb+") as f:
             f.write(chunk_data)
 
-
+# START
 class ServerStarterThread (threading.Thread):
     def __init__(self, name, logQueue, fihrist, uid2, interface_queue):
         threading.Thread.__init__(self)
@@ -388,21 +396,14 @@ class ServerStarterThread (threading.Thread):
         self.lQueue.put("Exiting " + self.name)
 
 
-
-def ClientStarter(address, logQueue, clientQueue, fihrist, uid, uid2, interface_dict):
+# START
+def ClientStarter(address, logQueue, clientDict, fihrist, uid, uid2, interface_dict):
     s = socket.socket()
     host = address
     port = 55555
     s.connect((host, port))
-    t = ClientWriterThread("CWT-" + address, s, logQueue, clientQueue, fihrist, uid2)
+    t = ClientWriterThread("CWT-" + address, s, logQueue, clientDict, fihrist, uid, uid2)
     t.start()
-    t = ClientReaderThread("CRT-" + address, s, logQueue, clientQueue, fihrist, uid, uid2, interface_dict)
+    t = ClientReaderThread("CRT-" + address, s, logQueue, clientDict, fihrist, uid, uid2, interface_dict)
     t.start()
-
-
-
-
-
-
-
 
