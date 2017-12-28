@@ -145,6 +145,8 @@ class ServerThread (threading.Thread):
         # server testi yapmak isteyene uuid degerimizi direk basiyoruz
         # gercek bir senaryoda guvenlik riski olusturur mu oturup tartismak gerek
         elif len(msg) == 1 and msg[0] == "DLT":
+            print(25*'*')
+            print(self.uid)
             self.sock.send(("ULT " + self.uid2).encode())
         # eger USR ile bize kayit olmamissa
         elif not self.uid:
@@ -276,7 +278,7 @@ class ClientWriterThread (threading.Thread):
         if len(msg) == 1 and msg[0] == "TIC":
             self.sock.send("TIC".encode())
         elif len(msg) == 1 and msg[0] == "LSQ":
-            self.sock.sen("LSQ".encode())
+            self.sock.send("LSQ".encode())
         elif len(msg) == 1 and msg[0] == "QUI":
             self.sock.send("QUI".encode())
             self.exitf = True
@@ -313,7 +315,9 @@ class ClientReaderThread (threading.Thread):
         self.lQueue.put("Starting " + self.name)
         while not self.exitf:
             msg = self.sock.recv(MB1 + 64).decode()
+            print(msg)
             self.parser(msg)
+            print(self.exitf)
         self.lQueue.put("Exiting " + self.name)
 
     def parser(self, msg):
@@ -326,6 +330,7 @@ class ClientReaderThread (threading.Thread):
         elif len(msg) >= 2 and msg[0] == "REJ":
             self.ifDict['res'].put(" ".join(msg))
         elif len(msg) == 1 and msg[0] == "BYE":
+            self.ifDict['res'].put('BYE')
             self.exitf = True
         elif len(msg) >= 2 and msg[0] == "VAN":
             self.ifDict['ListF'].append(" ".join(msg[1:]))
@@ -406,4 +411,5 @@ def ClientStarter(address, logQueue, clientDict, fihrist, uid, uid2, interface_d
     t.start()
     t = ClientReaderThread("CRT-" + address, s, logQueue, clientDict, fihrist, uid, uid2, interface_dict)
     t.start()
+
 

@@ -8,19 +8,19 @@ import time
 from peer import ClientStarter, ServerStarterThread, ListUpdaterThread, LoggerThread, MB1
 
 
-fihrist = {'msg': queue.Queue(),'listF':[],'res':queue.Queue(),'fUsers':{}}
+inDict = {'msg': queue.Queue(),'listF':[],'res':queue.Queue(),'fUsers':{}}
 logQueue = queue.Queue()
 
 userList={}
 clientDict = {}
 
-if os.path.exists('uuid.txt'):
-    with open('uuid.txt','r') as f:
+if os.path.exists('peeruuid.txt'):
+    with open('peeruuid.txt','r') as f:
         uid= f.read()
 else:
     uid = uuid.uuid4()
 
-    with open('uuid.txt','w') as f:
+    with open('peeruuid.txt','w') as f:
         f.write(str(uid))
 
 
@@ -81,6 +81,7 @@ class Window(QtWidgets.QWidget):
         self.sendButton.setGeometry(QtCore.QRect(380, 290, 271, 32))
         self.sendButton.setObjectName("sendButton")
         self.sendButton.clicked.connect(self.sendMessage)
+
         self.userListLabel = QtWidgets.QLabel("User List")
         self.userListLabel.setGeometry(QtCore.QRect(10, 20, 71, 16))
 
@@ -204,17 +205,21 @@ class Window(QtWidgets.QWidget):
 
         ip = self.connectIp.text()
         print(ip)
-        ClientStarter(ip,logQueue,clientDict,userList,'sallamauuid',uid,fihrist)
+        clientDict['a67a6d39-a170-4252-804f-9a6659be2844'] = queue.Queue()
+        ClientStarter(ip,logQueue,clientDict,userList,'a67a6d39-a170-4252-804f-9a6659be2844',str(uid),inDict)
 
-        print('client başladı')
 
+        protocolMessage = 'USR'
+        clientDict['a67a6d39-a170-4252-804f-9a6659be2844'].put(protocolMessage)
+        time.sleep(5)
+        print('USR gönderildi')
         protocolMessage = 'LSQ'
-        clientDict[uid].put(protocolMessage)
+        clientDict['a67a6d39-a170-4252-804f-9a6659be2844'].put(protocolMessage)
         print('LSQ gönderildi')
-        protocolMessage = 'QUI'
-        clientDict[uid].put(protocolMessage)
-        print('QUI gönderildi')
 
+        # protocolMessage = 'QUI'
+        # clientDict['a67a6d39-a170-4252-804f-9a6659be2844'].put(protocolMessage)
+        # print('QUI gönderildi')
 
 
 
@@ -254,6 +259,7 @@ loggerThread.start()
 
 app = QtWidgets.QApplication(sys.argv)
 a_window = Window()
+
 
 
 sys.exit(app.exec_())

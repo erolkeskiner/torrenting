@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import socket
 import threading
 import time
@@ -25,10 +28,10 @@ class LoggerThread (threading.Thread):
             print(str(msg))
         print(self.name + " exiting.")
 
-
-loggerQueue = Queue()
-lThread = LoggerThread("PeerLoggerThread", loggerQueue)
-lThread.start()
+#
+# loggerQueue = Queue()
+# lThread = LoggerThread("PeerLoggerThread", loggerQueue)
+# lThread.start()
 
 
 # Serverimizin aptal clienti
@@ -50,7 +53,7 @@ class ServerIdiotClient (threading.Thread):
         # yapmamizi sagliyor
         self.lQueue.put("Starting " + self.name)
         s = socket.socket()
-        host = self.address
+        host = self.address[0]
         port = 55555
         s.connect((host, port))
         s.send("DLT".encode())
@@ -60,8 +63,13 @@ class ServerIdiotClient (threading.Thread):
         while True:
             data = s.recv(1024).decode()
             data = data.strip().split(" ")
+
             if len(data) == 2:
+                print(25*'_')
+                print(data[1])
+                print(self.uid)
                 if data[0] == "ULT" and data[1] == self.uid:
+
                     if self.uid in self.fihrist:
                         # zaman damgasini basip okey veriyoruz
                         self.fihrist[self.uid][2] = 1
@@ -133,9 +141,11 @@ class ServerThread (threading.Thread):
         while not self.exitf:
             data = self.sock.recv(1024).decode()
             self.parser(data)
+
         self.lQueue.put("Exiting " + self.name)
 
     def parser(self, data):
+
         # Mesaji temizliyoruz
         msg = data.strip().split(" ")
         # Mesaj tek elamn ve TIC ise TOC gonder
@@ -144,33 +154,44 @@ class ServerThread (threading.Thread):
         # server testi yapmak isteyene uuid degerimizi direk basiyoruz
         # gercek bir senaryoda guvenlik riski olusturur mu oturup tartismak gerek
         elif len(msg) == 1 and msg[0] == "DLT":
+            print(25*'1')
             self.sock.send(("ULT " + self.uid2).encode())
         # eger USR ile bize kayit olmamissa
         elif not self.uid:
             # USR <uuid> <(server mi peer mi)> toplamda uc tane eleman olcak
             # yoksa hata verdiricez
-            if len(msg) != 3:
-                val = "ERR: Need Login"
+
+            if len(msg) != 2:
+
+                val = "ERR: Need Login1"
                 self.lQueue.put(time.ctime() + "-" + str(self.address) + ": " + val)
                 self.sock.send(val.encode())
             else:
                 if msg[0] == "USR":
                     # msg[2] dedigimiz 1 ise peer, 0 ise N_Server. peer fihrist icinde yoksa
                     # kaydediyoruz ve downloadTest yapiyoruz
-                    if msg[1] not in self.fihrist and (msg[2] == 0 or msg[2] == 1):
+                    if msg[1] not in self.fihrist:
                         self.uid = msg[1]
+                        ip = str(self.address[0])
+
+                        port = str(self.address[1])
                         self.sock.send(("HEL " + msg[1]).encode())
-                        self.lQueue.put(time.ctime() + "-" + self.address + ":" + self.uid + " has added to list.\n")
+                        self.lQueue.put(time.ctime() + "-" + ip + ':' + port + "-" + self.uid + " has added to list.\n")
                         # fihrist icinde sirasiyla adres, en son baglati zamani, gerceklik testi(downloadTest)
                         # false icin 0 true icin 1 ve son olarak peer mi server mi
-                        self.fihrist[self.uid] = [self.address, time.ctime(), self.trueTest, msg[2]]
+                        self.fihrist[self.uid] = [self.address, time.ctime(), self.trueTest]
                         # serveri gercekten varmi diye bakiyoruz
                         sic = ServerIdiotClient("ServerIdiotClient", self.address, self.lQueue, self.fihrist,
                                                 self.uid)
                         sic.start()
                     # peer fihrist icinde varsa zaman damgasini yenileyip test yapiyoruz
                     else:
-                        self.lQueue.put(time.ctime() + "-" + self.address + ":" + self.uid + " has renewed.\n")
+                        ip = str(self.address[0])
+
+                        port = str( self.address[1])
+                        self.sock.send(("HEL " + msg[1]).encode())
+                        self.uid = msg[1]
+                        self.lQueue.put(str(time.ctime()) + "-" + ip + ':' + port + "-" + self.uid + " has renewed.\n")
                         self.fihrist[self.uid][1] = time.ctime()
                         sic = ServerIdiotClient("ServerIdiotClient", self.address, self.lQueue, self.fihrist,
                                                 self.uid)
@@ -178,15 +199,18 @@ class ServerThread (threading.Thread):
                 # 3 tane parametre gondermis ama birincisi USR degilse buraya girecek
                 # neden bastan kontrol etmedin derseniz.. Bilmiyorum. O an mantikli gelmisti.
                 else:
-                    val = "ERR: Need Login"
+                    val = "ERR: Need Login2"
                     self.lQueue.put(time.ctime() + "-" + str(self.address) + ": " + val)
                     self.sock.send(val.encode())
         # buraya girerse testi gecmis ve istedigini yapabilir
-        elif self.trueTest:
+        elif self.fihrist[self.uid][2]:
+            print(23*'-')
+            self.trueTest = self.fihrist[self.uid][2]
             if len(msg) == 1 and msg[0] == "LSQ":
                 self.sock.send(("LSA " + self.list_returner()).encode())
             # QUI komutu gelmisse bu thread kapatilacak main threadler hala calisiyor olacak ama
             elif len(msg) == 1 and msg[0] == "QUI":
+                self.sock.send('BYE'.encode())
                 if self.uid in self.fihrist:
                     del self.fihrist[self.uid]
                 self.exitf = 1
@@ -206,11 +230,10 @@ class ServerThread (threading.Thread):
 
 
 class ServerStarterThread (threading.Thread):
-    def __init__(self, name, sock, address, logQueue, fihrist, uid2):
+    def __init__(self, name, logQueue, fihrist, uid2):
         threading.Thread.__init__(self)
         self.name = name
-        self.sock = sock
-        self.address = address
+
         self.lQueue = logQueue
         self.fihrist = fihrist
         # uid2 bizim uuid degerimiz sistem basalarken bi tane olusturulup butun threadlere dagitilacak
@@ -235,6 +258,7 @@ class ServerStarterThread (threading.Thread):
             thread_c += 1
             sThread = ServerThread("ServerThread-" + str(thread_c), c, a, self.lQueue, self.fihrist, self.uid2)
             sThread.start()
+
 
         # FIXME programi kapatirken donguden cikilmali
         self.lQueue.put("Exiting " + self.name)
