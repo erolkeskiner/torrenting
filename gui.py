@@ -5,9 +5,11 @@ import os.path
 import search
 import queue
 import time
+from peer import ClientStarter, ServerStarterThread, ListUpdaterThread, LoggerThread, MB1
 
 
 fihrist = {'msg': queue.Queue(),'listF':[],'res':queue.Queue(),'fUsers':{}}
+logQueue = queue.Queue()
 
 userList={}
 clientDict = {}
@@ -173,38 +175,67 @@ class Window(QtWidgets.QWidget):
 
 
     def search(self):
-        self.resultOfSearch.clear()
-        fihrist['listF'] = []
-        fihrist['fUsers'] = {}
-
-
-        fileName = self.fileNameTextEdit.text()
-
-        proMessage = ('SHN '+fileName).encode()
-
-        
-
-
-        time.sleep(3)
-
-        for l in fihrist['listF']:
-            self.resultOfSearch.addItem(l)
-
-        self.resultOfSearch.repaint()
+         self.resultOfSearch.clear()
+        # fihrist['listF'] = []
+        # fihrist['fUsers'] = {}
+        #
+        #
+        # fileName = self.fileNameTextEdit.text()
+        #
+        # proMessage = ('SHN '+fileName).encode()
+        # for user , q in userList.items():
+        #     ClientStarter('',logQueue,clientDict,userList,user,uid,fihrist)
+        #     clientDict[user].put(proMessage)
+        #
+        #
+        #
+        #
+        # time.sleep(3)
+        #
+        # for l in fihrist['listF']:
+        #     self.resultOfSearch.addItem(l)
+        #
+        # self.resultOfSearch.repaint()
+        # for user, q in userList.items():
+        #     clientDict[user].put("QUI")
 
 
     def connectToNetwork(self):
 
         ip = self.connectIp.text()
-
-
-
-
         print(ip)
+        ClientStarter(ip,logQueue,clientDict,userList,'sallamauuid',uid,fihrist)
+
+        print('client başladı')
+
+        protocolMessage = 'LSQ'
+        clientDict[uid].put(protocolMessage)
+        print('LSQ gönderildi')
+        protocolMessage = 'QUI'
+        clientDict[uid].put(protocolMessage)
+        print('QUI gönderildi')
+
+
+
+
+
 
     def start_download(self):
         fileChoise = self.resultOfSearch.currentItem().text()
-        print(fileChoise)
+        # l = fileChoise.split()
+        #
+        # numberOfChunks = (int(l[2] / MB1) + 1)
+        # foundUsers = fihrist['fUsers'].items()
+        # for user , q in foundUsers:
+        #
+        #     ClientStarter('',logQueue,clientDict,userList,user,uid,fihrist)
+        #
+        #
+        # for i in numberOfChunks:
+
+
+
+
 
     def sendMessage(self):
         message = self.messageToSend.toPlainText()
@@ -217,7 +248,12 @@ class Window(QtWidgets.QWidget):
 
 
 
+loggerThread = LoggerThread('Logger',logQueue)
+loggerThread.start()
+
+
 app = QtWidgets.QApplication(sys.argv)
 a_window = Window()
+
 
 sys.exit(app.exec_())
