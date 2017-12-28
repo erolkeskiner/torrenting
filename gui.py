@@ -2,11 +2,27 @@ import sys
 from PyQt5 import QtWidgets,QtGui,QtCore
 import uuid
 import os.path
-import searchByFileName
+import search
+import queue
+import time
+
+
+fihrist = {'msg': queue.Queue(),'listF':[],'res':queue.Queue(),'fUsers':{}}
+
+userList={}
+clientDict = {}
+
+if os.path.exists('uuid.txt'):
+    with open('uuid.txt','r') as f:
+        uid= f.read()
+else:
+    uid = uuid.uuid4()
+
+    with open('uuid.txt','w') as f:
+        f.write(str(uid))
 
 
 
-listDosya = ['dosya1','dosya2','dosya3']
 
 class Window(QtWidgets.QWidget):
     def __init__(self):
@@ -20,9 +36,10 @@ class Window(QtWidgets.QWidget):
         self.fileNameLabel = QtWidgets.QLabel("File name :")
         self.fileNameLabel.setGeometry(QtCore.QRect(10, 20, 71, 16))
         self.fileNameLabel.setObjectName("fileNameLabel")
-        self.fileNameTextEdit = QtWidgets.QTextEdit("Search for a file")
+        self.fileNameTextEdit = QtWidgets.QLineEdit()
         self.fileNameTextEdit.setGeometry(QtCore.QRect(80, 10, 81, 31))
         self.fileNameTextEdit.setObjectName("fileNameTextEdit")
+
         self.searchButton = QtWidgets.QPushButton("Search")
         self.searchButton.setGeometry(QtCore.QRect(190, 10, 91, 32))
         self.searchButton.setObjectName("searchButton")
@@ -33,8 +50,7 @@ class Window(QtWidgets.QWidget):
         self.resultOfSearch.setGeometry(QtCore.QRect(10, 50, 271, 192))
         self.resultOfSearch.setObjectName("resultOfSearch")
 
-        for dosya in listDosya:
-            self.resultOfSearch.addItem(dosya)
+
         self.iconforprogress = QtWidgets.QLabel("Progress Icon")
         self.iconforprogress.setGeometry(QtCore.QRect(160, 10, 31, 16))
         self.iconforprogress.setObjectName("iconforprogress")
@@ -49,6 +65,10 @@ class Window(QtWidgets.QWidget):
         self.userListWidget = QtWidgets.QListWidget()
         self.userListWidget.setGeometry(QtCore.QRect(290, 50, 91, 261))
         self.userListWidget.setObjectName("userListWidget")
+        for u in userList:
+            self.userListWidget.addItem(u)
+
+
         self.viewMessages = QtWidgets.QTextBrowser()
         self.viewMessages.setGeometry(QtCore.QRect(390, 10, 261, 201))
         self.viewMessages.setObjectName("viewMessages")
@@ -61,10 +81,22 @@ class Window(QtWidgets.QWidget):
         self.sendButton.clicked.connect(self.sendMessage)
         self.userListLabel = QtWidgets.QLabel("User List")
         self.userListLabel.setGeometry(QtCore.QRect(10, 20, 71, 16))
+
         self.userListLabel.setObjectName("userListLabel")
         self.messagesLabel = QtWidgets.QLabel("Messages")
         self.messagesLabel.setGeometry(QtCore.QRect(10, 20, 71, 16))
         self.messagesLabel.setObjectName("messagesLabel")
+
+        self.connectLabel = QtWidgets.QLabel("Connect to network with IP")
+        self.connectLabel.setObjectName("connectLabel")
+
+        self.connectIp = QtWidgets.QLineEdit()
+        self.connectIp.setObjectName('connectIp')
+
+        self.connectButton = QtWidgets.QPushButton("Connect")
+        self.connectButton.setObjectName("connectButton")
+
+        self.connectButton.clicked.connect(self.connectToNetwork)
 
         mainHBox = QtWidgets.QHBoxLayout()
 
@@ -93,19 +125,25 @@ class Window(QtWidgets.QWidget):
         torrentVBox.addWidget(self.downloadButton)
         torrentVBox.addStretch()
 
-        mainHBox.addLayout(torrentVBox)
-        mainHBox.addStretch()
 
+        lmHBox = QtWidgets.QHBoxLayout()
 
         listVBox = QtWidgets.QVBoxLayout()
+        connectHBox = QtWidgets.QHBoxLayout()
+        connectHBox.addWidget(self.connectLabel)
+        connectHBox.addWidget(self.connectIp)
+        connectHBox.addWidget(self.connectButton)
+
+        listVBox.addLayout(connectHBox)
 
         listVBox.addWidget(self.userListLabel)
-        listVBox.addStretch()
-        listVBox.addWidget(self.userListWidget)
-        listVBox.addStretch()
 
-        messageVBox.addLayout(listVBox)
-        messageVBox.addStretch()
+        listVBox.addWidget(self.userListWidget)
+
+        lmHBox.addLayout(listVBox)
+
+
+
 
         mVBox = QtWidgets.QVBoxLayout()
         mVBox.addWidget(self.messagesLabel)
@@ -117,38 +155,69 @@ class Window(QtWidgets.QWidget):
         mVBox.addWidget(self.sendButton)
         mVBox.addStretch()
 
-        messageVBox.addLayout(mVBox)
+        lmHBox.addLayout(mVBox)
+
+        messageVBox.addLayout(lmHBox)
         messageVBox.addStretch()
+
         mainHBox.addLayout(messageVBox)
         mainHBox.addStretch()
+        mainHBox.addLayout(torrentVBox)
+        mainHBox.addStretch()
+
 
         self.setLayout(mainHBox)
 
         self.show()
 
-    def search(self):
-        filename = self.fileNameTextEdit.toPlainText()
-        b , l = searchByFileName.search(filename)
-        self.resultOfSearch.clear()
-        if b is True:
-            self.resultOfSearch.addItem(filename)
-            self.foundCheckBrowser.setText('File Found!')
-        else:
-            self.foundCheckBrowser.setText('File Not Found! Similar results are in the list')
-            for f in l:
-                self.resultOfSearch.addItem(f)
 
+
+    def search(self):
+        self.resultOfSearch.clear()
+        fihrist['listF'] = []
+        fihrist['fUsers'] = {}
+
+
+        fileName = self.fileNameTextEdit.text()
+
+        proMessage = ('SHN '+fileName).encode()
+
+        
+
+
+        time.sleep(3)
+
+        for l in fihrist['listF']:
+            self.resultOfSearch.addItem(l)
+
+        self.resultOfSearch.repaint()
+
+
+    def connectToNetwork(self):
+
+        ip = self.connectIp.text()
+
+
+
+
+        print(ip)
 
     def start_download(self):
         fileChoise = self.resultOfSearch.currentItem().text()
         print(fileChoise)
+
     def sendMessage(self):
         message = self.messageToSend.toPlainText()
 
         print(message)
 
+    def update_userList(self):
+        for i in userList:
+            self.userListWidget.addItem(i)
+
 
 
 app = QtWidgets.QApplication(sys.argv)
 a_window = Window()
+
 sys.exit(app.exec_())

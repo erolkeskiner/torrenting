@@ -50,4 +50,3 @@ def search(fileName):
         else:
             return False, []
 
-print(search('DSCF3403.MOV'))
