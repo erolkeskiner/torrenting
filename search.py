@@ -17,7 +17,8 @@ from difflib import SequenceMatcher
 
 def search(fileName):
     list = []
-    for name in glob.glob('shared/*'):
+    for name in glob.glob('./shared/*'):
+
         # print (name)
         x = name.split('\\')
         list.append(x[1])
@@ -48,5 +49,6 @@ def search(fileName):
         elif len(m) ==1:
             return False,[m[0]]
         else:
+
             return False, []
 

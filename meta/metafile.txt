@@ -1,0 +1,3 @@
+To push directory 
+Normally this directory contains meta files
+meta files can be created once a shared file seperated to chunks
