@@ -48,7 +48,7 @@ class ServerIdiotClient (threading.Thread):
         # yapmamizi sagliyor
         self.lQueue.put("Starting " + self.name)
         s = socket.socket()
-        host = self.address
+        host = self.address[0]
         port = 55555
         s.connect((host, port))
         s.send("DLT".encode())
@@ -72,14 +72,13 @@ class ServerIdiotClient (threading.Thread):
 # ip listelerini guncelleyen thread gerekli degerler verilip ana thread uzerinden cagirilacak
 # START
 class ListUpdaterThread (threading.Thread):
-    def __init__(self, name, address, logQueue, fihrist, uid, uid2):
+    def __init__(self, name,  logQueue, fihrist,  uid2):
         threading.Thread.__init__(self)
         self.name = name
-        self.address = address
+
         self.lQueue = logQueue
         self.fihrist = fihrist
-        # uid karsinin uuid
-        self.uid = uid
+
         # bizim uuid
         self.uid2 = uid2
 
@@ -94,8 +93,8 @@ class ListUpdaterThread (threading.Thread):
                 # download testi gecmemis olanlari test ediyor gecerlerse zaman damgasi basip okey veriyor
                 if self.fihrist[a][2] == 0:
 
-                    sic = ServerIdiotClient("ServerIdiotClient", self.address, self.lQueue, self.fihrist,
-                                            self.uid)
+                    sic = ServerIdiotClient("ServerIdiotClient", self.fihrist[a][0], self.lQueue, self.fihrist,
+                                            a)
                     sic.start()
                 # 10 dakikadir baglantiyi duzgun kurammais birileri varsa onlarin testini false yapiyor(aslinda 0)
                 if time.time() - time.mktime(self.fihrist[a][1]) > 600:
@@ -363,7 +362,7 @@ class ClientReaderThread (threading.Thread):
 
     def chunk_writer(self, md5sum, chunk_no, chunk_data):
         chunk_data = chunk_data.encode()
-        with open("./tmp/" + md5sum + "-" + chunk_no, "wb+") as f:
+        with open("./tmp/" + md5sum + "-" + chunk_no, "wb") as f:
             f.write(chunk_data)
 
 # START
