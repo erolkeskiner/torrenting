@@ -185,6 +185,7 @@ class Window(QtWidgets.QWidget):
 
     def search(self):
          self.resultOfSearch.clear()
+         print(inDict)
          inDict['listF'] = []
          inDict['fUsers'] = {}
 
@@ -194,13 +195,14 @@ class Window(QtWidgets.QWidget):
          proMessage = ('SHN '+fileName).encode()
          for user , q in userList.items():
              ClientStarter(userList[user][0],logQueue,clientDict,userList,user,uid,inDict)
+             print(userList[user])
              clientDict[user].put(proMessage)
 
 
 
 
          time.sleep(3)
-
+         print(inDict)
          for l in inDict['listF']:
              self.resultOfSearch.addItem(l)
 

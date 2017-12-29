@@ -173,7 +173,7 @@ class ServerThread (threading.Thread):
                     # peer fihrist icinde varsa zaman damgasini yenileyip test yapiyoruz
                     else:
                         self.lQueue.put(time.ctime() + "-" + self.address + ":" + self.uid + " has renewed.\n")
-                        self.fihrist[self.uid][1] = time.ctime()
+                        self.fihrist[self.uid] = [self.address, time.ctime(), self.trueTest]
                         sic = ServerIdiotClient("ServerIdiotClient", self.address, self.lQueue, self.fihrist,
                                                 self.uid)
                         sic.start()
@@ -184,8 +184,8 @@ class ServerThread (threading.Thread):
                     self.lQueue.put(time.ctime() + "-" + str(self.address) + ": " + val)
                     self.sock.send(val.encode())
         elif len(msg) == 1 and msg[0] == "QUI":
-            if self.uid in self.fihrist:
-                del self.fihrist[self.uid]
+            # if self.uid in self.fihrist:
+            #     del self.fihrist[self.uid]
             self.sock.send("BYE".encode())
             self.exitf = True
         # buraya girerse testi gecmis ve istedigini yapabilir
@@ -314,6 +314,7 @@ class ClientReaderThread (threading.Thread):
         self.lQueue.put("Starting " + self.name)
         while not self.exitf:
             msg = self.sock.recv(MB1 + 64).decode()
+            print('clienta gelen mesaj')
             print(msg)
             self.parser(msg)
             print(self.exitf)
@@ -321,8 +322,9 @@ class ClientReaderThread (threading.Thread):
 
     def parser(self, msg):
         msg = msg.strip().split(" ")
-        if len(msg) == 2 and msg[0] == "LSA":
-            self.list_parser(msg[1])
+        if msg[0] == "LSA":
+            self.list_parser(' '.join(msg[1:]))
+            print(' '.join(msg[1:]))
             self.lQueue.put("List updated.")
         elif len(msg) == 1 and msg[0] == "HEL":
             self.ifDict['res'].put(msg[0])
