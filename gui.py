@@ -194,6 +194,8 @@ class Window(QtWidgets.QWidget):
 
          proMessage = ('SHN '+fileName).encode()
          for user , q in userList.items():
+             if (user == uid):
+                 continue
              ClientStarter(userList[user][0],logQueue,clientDict,userList,user,uid,inDict)
              print(userList[user])
              clientDict[user].put(proMessage)
