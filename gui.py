@@ -5,6 +5,7 @@ import os.path
 import search
 import queue
 import time
+import glob
 from peer import ClientStarter, ServerStarterThread, ListUpdaterThread, LoggerThread, MB1
 
 
@@ -101,6 +102,11 @@ class Window(QtWidgets.QWidget):
 
         self.connectButton.clicked.connect(self.connectToNetwork)
 
+        self.progress = QtWidgets.QProgressBar(self)
+        self.progress.setGeometry(200, 80, 250, 20)
+
+
+
         mainHBox = QtWidgets.QHBoxLayout()
 
         torrentVBox = QtWidgets.QVBoxLayout()
@@ -126,6 +132,8 @@ class Window(QtWidgets.QWidget):
         torrentVBox.addWidget(self.foundCheckBrowser)
         torrentVBox.addStretch()
         torrentVBox.addWidget(self.downloadButton)
+        torrentVBox.addStretch()
+        torrentVBox.addWidget(self.progress)
         torrentVBox.addStretch()
 
 
@@ -177,49 +185,49 @@ class Window(QtWidgets.QWidget):
 
     def search(self):
          self.resultOfSearch.clear()
-        # fihrist['listF'] = []
-        # fihrist['fUsers'] = {}
-        #
-        #
-        # fileName = self.fileNameTextEdit.text()
-        #
-        # proMessage = ('SHN '+fileName).encode()
-        # for user , q in userList.items():
-        #     ClientStarter('',logQueue,clientDict,userList,user,uid,fihrist)
-        #     clientDict[user].put(proMessage)
-        #
-        #
-        #
-        #
-        # time.sleep(3)
-        #
-        # for l in fihrist['listF']:
-        #     self.resultOfSearch.addItem(l)
-        #
-        # self.resultOfSearch.repaint()
-        # for user, q in userList.items():
-        #     clientDict[user].put("QUI")
+         inDict['listF'] = []
+         inDict['fUsers'] = {}
+
+
+         fileName = self.fileNameTextEdit.text()
+
+         proMessage = ('SHN '+fileName).encode()
+         for user , q in userList.items():
+             ClientStarter(userList[user][0],logQueue,clientDict,userList,user,uid,inDict)
+             clientDict[user].put(proMessage)
+
+
+
+
+         time.sleep(3)
+
+         for l in inDict['listF']:
+             self.resultOfSearch.addItem(l)
+
+         self.resultOfSearch.repaint()
+         for user, q in userList.items():
+             clientDict[user].put("QUI")
 
 
     def connectToNetwork(self):
 
         ip = self.connectIp.text()
         print(ip)
-        clientDict['a67a6d39-a170-4252-804f-9a6659be2844'] = queue.Queue()
-        ClientStarter(ip,logQueue,clientDict,userList,'a67a6d39-a170-4252-804f-9a6659be2844',str(uid),inDict)
+        clientDict['n_server'] = queue.Queue()
+        ClientStarter(ip,logQueue,clientDict,userList,'n_server',str(uid),inDict)
 
 
         protocolMessage = 'USR'
-        clientDict['a67a6d39-a170-4252-804f-9a6659be2844'].put(protocolMessage)
+        clientDict['n_server'].put(protocolMessage)
         time.sleep(5)
         print('USR gönderildi')
         protocolMessage = 'LSQ'
-        clientDict['a67a6d39-a170-4252-804f-9a6659be2844'].put(protocolMessage)
+        clientDict['n_server'].put(protocolMessage)
         print('LSQ gönderildi')
 
-        # protocolMessage = 'QUI'
-        # clientDict['a67a6d39-a170-4252-804f-9a6659be2844'].put(protocolMessage)
-        # print('QUI gönderildi')
+        protocolMessage = 'QUI'
+        clientDict['n_server'].put(protocolMessage)
+        print('QUI gönderildi')
 
 
 
@@ -227,16 +235,74 @@ class Window(QtWidgets.QWidget):
 
     def start_download(self):
         fileChoise = self.resultOfSearch.currentItem().text()
-        # l = fileChoise.split()
-        #
-        # numberOfChunks = (int(l[2] / MB1) + 1)
-        # foundUsers = fihrist['fUsers'].items()
-        # for user , q in foundUsers:
-        #
-        #     ClientStarter('',logQueue,clientDict,userList,user,uid,fihrist)
-        #
-        #
-        # for i in numberOfChunks:
+        l = fileChoise.split(" ")
+
+        numberOfChunks = int(l[2] / MB1)
+
+        if (l[2] % MB1 != 0):
+            numberOfChunks += 1
+        md5 = l[1]
+
+        for user in userList:
+            if(userList[user][2] == 1):
+                ClientStarter(userList[user][0], logQueue, clientDict, userList, user, uid, inDict)
+                clientDict[user].put('SHC ' + md5)
+
+        time.time(1)
+        for user in userList:
+            clientDict[user].put('QUI')
+
+
+        time.sleep(1)
+
+        for user in inDict['fUsers']:
+            ClientStarter(inDict['fUsers'][user][0],logQueue,clientDict,userList,user,uid,inDict)
+            clientDict[user].put('USR')
+
+        time.sleep(1)
+
+
+
+        dwdDict = {}
+        for i in range(numberOfChunks):
+            dwdDict[i] = False
+        c = 0
+        liste = []
+        for x in inDict['fUsers']:
+            liste.append((c,x))
+            c += 1
+        boyutListe = len(liste)
+
+        count = 0
+        self.completed = 0
+        while count < (numberOfChunks - 1) :
+            fileList = os.listdir('./tmp/')
+            for i in fileList:
+                b = i.split('-')
+                if (b[0]==md5):
+                    dwdDict[b[1]] = True
+            counter = 0
+
+
+            for d in dwdDict:
+                if dwdDict[d] == False:
+                    protocolMessage = 'DWL '+ md5+' '+str(d)
+
+                clientDict[liste[counter][1]].put(protocolMessage)
+                counter += 1
+                if(counter == boyutListe):
+                    counter = 0
+
+            time.sleep(1)
+
+            count = len(glob.glob1('./tmp/',md5+"-*"))
+            self.completed = (100 / numberOfChunks) * count
+            self.progress.setValue(self.completed)
+
+
+
+
+
 
 
 
@@ -253,8 +319,14 @@ class Window(QtWidgets.QWidget):
 
 
 
-loggerThread = LoggerThread('Logger',logQueue)
+loggerThread = LoggerThread('LoggerTest',logQueue)
 loggerThread.start()
+
+serverStarter = ServerStarterThread('ServerStarterTest',logQueue,userList,uid,inDict)
+serverStarter.start()
+listUpdater = ListUpdaterThread('ListUpdatertest', logQueue, userList, str(uid))
+listUpdater.start()
+
 
 
 app = QtWidgets.QApplication(sys.argv)
